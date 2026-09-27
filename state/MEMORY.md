@@ -1,0 +1,22 @@
+# Durable decisions
+
+- Project name: **Knot**.
+- Product shape: reusable standalone Intelligent Contract primitive, not a frontend product.
+- Core value: deterministic Saga coordination plus independently verified semantic postconditions.
+- Target: Studio Next / Studio-dev chain `61997`; the stable network is not sufficient for the current submission requirement.
+- First milestone: success path plus failure/reverse-compensation path on the real target environment.
+- Other OpenCode session: keep read-only; this session owns implementation in `/home/unify/pavel`.
+- Real `.env` exists and contains sensitive configuration. It must remain untouched and ignored.
+- Hash canonicalization is `knot-sha256-v1`: versioned, domain-separated, length-prefixed fields; blueprint hashes aggregate step hashes in ordinal order.
+- Public URL evidence uses a frozen exact HTTPS prefix; participant text is explicitly non-corroborated.
+- Timeouts start at parent dispatch time with a 300-second minimum; late callbacks are accepted until timeout crystallization.
+- Compensation retries revalidate the same logical operation ID, with three total attempts maximum in v1.
+- The initial Saga controller is the blueprint owner; permissionless start is deferred.
+- The contract header is pinned to the v0.6.0-rc6 runner hash `5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng` found in the published GenVM universal bundle.
+- The implementation targets the actual v0.6 RC Python surface: `import genlayer as gl`, `gl.contract.Contract`, `gl.chain.Event`, `gl.storage.allow`, `gl.contract.get_at`, and `gl.vm.run_nondet`. Older documentation examples using `from genlayer import *`, `gl.Contract`, or `run_nondet_unsafe` are not the target API.
+- v0.6 storage gotcha: `DynArray[T]()` always raises `TypeError`. A storage record's DynArray field must be seeded with a plain sequence (e.g. `receipt_ids=[]`); `_DynArrayDesc.set` accepts any `Sequence`.
+- `gl.nondet.web.render(...)` / `gl.nondet.exec_prompt(...)` are the *eager* `_lazy_api` wrappers and return values directly; `.lazy()` is the variant that returns `Lazy`. Never call `.get()` on them.
+- gltest `vm.mock_llm` auto-parses JSON **strings** into dicts, but the v0.6 std's `exec_prompt(response_format="json")` requires the `ok` payload to be text. Pass mock responses as **bytes** to bypass the auto-parse.
+- gltest `vm.warp(iso)` only updates its own clock; the SDK snapshot of `genlayer.message.raw` is injected once at import. To make a contract read a warped block time, set `raw["datetime"]` in place (see `set_time` in `tests/direct/test_knot_saga.py`).
+- Local direct runs must set `GENVM_VERSION=v0.6.0-rc5` (its extracted tree is cached under `~/.cache/gltest-direct/trees-v2/`). The `/tmp/opencode/genvm-rc6` prebuilt tree is wiped on server restarts. rc5 and rc6 ship the same `py-genlayer` runner `5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng` and the same std lib `kzr02...`, so contract behavior is identical; CI uses `v0.6.0-rc6`.
+- Direct mode cannot execute cross-contract calls (`execute_step` / `compensate_step` are logged as unknown `gl_call` requests and dropped), so the dispatch side of the saga only runs in integration tests.

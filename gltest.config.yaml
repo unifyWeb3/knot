@@ -1,0 +1,16 @@
+networks:
+  default: localnet
+
+  localnet:
+    url: http://127.0.0.1:4000/api
+    leader_only: false
+
+  # Preconfigured in genlayer-test v0.30.0-rc.2.
+  studio_devnet: {}
+  studionet: {}
+
+paths:
+  contracts: contracts
+  artifacts: artifacts
+
+environment: .env

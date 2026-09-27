@@ -1,0 +1,25 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+.env:Zone.Identifier
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Node/tooling
+node_modules/
+.npm/
+
+# GenLayer local outputs
+artifacts/
+*.log
+.DS_Store

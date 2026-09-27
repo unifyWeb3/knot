@@ -1,0 +1,5 @@
+# Studio Next / Consensus v0.6 release-candidate test toolchain.
+genlayer-test @ git+https://github.com/genlayerlabs/genlayer-testing-suite@v0.30.0-rc.2
+genlayer-py==0.19.0rc2
+pytest>=8.0,<9
+genvm-linter==0.11.1rc2

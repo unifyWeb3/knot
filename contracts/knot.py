@@ -629,7 +629,12 @@ class Knot(gl.contract.Contract):
                 + source
             )
             try:
-                raw = gl.nondet.exec_prompt(prompt, response_format="json")
+                # Text mode keeps parsing in one place: the executor returns the
+                # raw model output and _v_parse_decision extracts the JSON object
+                # (bare, fenced, or embedded in prose). Malformed output fails
+                # closed to AMBIGUOUS, transport/executor errors to UNAVAILABLE;
+                # neither can advance a step or complete a compensation.
+                raw = gl.nondet.exec_prompt(prompt, response_format="text")
                 parsed = _v_parse_decision(raw) if isinstance(raw, str) else raw
                 if not _v_valid_decision(parsed):
                     return _v_ambiguous("evidence model returned an invalid decision")

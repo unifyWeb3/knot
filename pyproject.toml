@@ -1,3 +1,6 @@
 [tool.pytest.ini_options]
 testpaths = ["tests/direct"]
 addopts = "-q"
+markers = [
+    "integration: cross-contract lifecycle tests driven on the local glsim network (run explicitly via `pytest tests/integration`)",
+]

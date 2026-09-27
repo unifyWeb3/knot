@@ -51,9 +51,15 @@ def set_time(vm, timestamp: str) -> None:
         raw["datetime"] = timestamp
 
 
-def llm_json(payload: dict) -> bytes:
-    """Encode a decision as bytes so gltest does not pre-parse the JSON."""
-    return json.dumps(payload).encode("utf-8")
+def llm_text(payload: dict) -> str:
+    """Encode a decision as prose+JSON text.
+
+    The contract requests ``response_format="text"`` and parses the JSON object
+    out of the model reply itself. gltest's mock layer auto-parses *bare* JSON
+    strings into dicts, which the text decoder rejects, so a non-JSON prefix is
+    required to keep the mock response as text.
+    """
+    return "Decision:\n" + json.dumps(payload)
 
 
 def mock_verdict(vm, source: str, verdict: str) -> None:
@@ -63,7 +69,7 @@ def mock_verdict(vm, source: str, verdict: str) -> None:
         "reason": "The source establishes the criterion.",
         "evidence": source[:80] if verdict == "SATISFIED" else "",
     }
-    vm.mock_llm(r"SOURCE=" + re.escape(source), llm_json(payload))
+    vm.mock_llm(r"SOURCE=" + re.escape(source), llm_text(payload))
 
 
 def add_step(contract, blueprint_id, participant, label, timeout=600):

@@ -7,15 +7,15 @@ URL_MODE = 2
 PREFIX = "https://raw.example.com/unifyWeb3/knot/commit/fixtures/"
 
 
-def _llm_json(payload: dict) -> bytes:
-    """Encode an LLM decision as bytes.
+def _llm_text(payload: dict) -> str:
+    """Encode an LLM decision the way a chatty model reply looks.
 
-    gltest's mock auto-parses JSON *strings* into dicts, but the v0.6 std lib
-    requires ``exec_prompt(response_format="json")`` to receive the raw JSON
-    text. Passing bytes keeps the mock from parsing while remaining valid JSON
-    for the std lib decoder.
+    The contract asks for ``response_format="text"`` and extracts the JSON
+    object itself, so the response is prose plus JSON. gltest's mock layer
+    auto-parses *bare* JSON strings into dicts (which the text decoder then
+    rejects), so the prefix is what keeps the mock response as text.
     """
-    return json.dumps(payload).encode("utf-8")
+    return "Decision:\n" + json.dumps(payload)
 
 
 def test_evidence_judgment_rederives_and_agrees(direct_vm, direct_deploy):
@@ -27,7 +27,7 @@ def test_evidence_judgment_rederives_and_agrees(direct_vm, direct_deploy):
     )
     direct_vm.mock_llm(
         r".*",
-        _llm_json(
+        _llm_text(
             {
                 "verdict": "SATISFIED",
                 "reason": "The source states that the reservation is confirmed.",
@@ -56,7 +56,7 @@ def test_validator_rejects_a_different_source(direct_vm, direct_deploy):
     )
     direct_vm.mock_llm(
         r".*",
-        _llm_json(
+        _llm_text(
             {
                 "verdict": "SATISFIED",
                 "reason": "The source states that the reservation is confirmed.",
@@ -80,7 +80,7 @@ def test_validator_rejects_a_different_source(direct_vm, direct_deploy):
     )
     direct_vm.mock_llm(
         r".*",
-        _llm_json(
+        _llm_text(
             {
                 "verdict": "NOT_SATISFIED",
                 "reason": "The source states that the reservation was cancelled.",

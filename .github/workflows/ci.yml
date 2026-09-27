@@ -26,3 +26,17 @@ jobs:
           genvm-lint check contracts/reference_participant.py
       - name: Direct-mode tests
         run: pytest tests/direct -q
+
+  integration:
+    runs-on: ubuntu-latest
+    env:
+      GENVM_VERSION: v0.6.0-rc6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements-integration.txt
+      - name: Cross-contract lifecycle tests (glsim)
+        run: pytest tests/integration -q

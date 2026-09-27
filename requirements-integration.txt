@@ -1,0 +1,6 @@
+# Extra dependencies for the glsim-backed cross-contract suite
+# (tests/integration). The toolchain itself is pinned by requirements-test.txt.
+-r requirements-test.txt
+fastapi>=0.115
+httpx>=0.27
+rlp>=0.6

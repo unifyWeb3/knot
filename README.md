@@ -50,7 +50,6 @@ contracts/                 Core Intelligent Contract and reference participant
  tests/direct/             Fast state-machine and validator tests
  tests/integration/        Cross-contract lifecycle tests on the local simulator
  scripts/                  Preflight, deployment, and evidence helpers
- fixtures/                 Commit-pinned public evidence fixtures
  state/                    Project checkpoints and handoff notes
 ```
 

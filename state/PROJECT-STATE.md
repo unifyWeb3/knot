@@ -45,7 +45,8 @@ Every finding was reproduced before it was acted on.
 ## Deployment
 
 - Knot: `0xDFCd787F4E8048d29602ebd09b2B2B91f3E97C2B`, deploy tx `0xec1c79b4…b1ffba6`, `MAJORITY_AGREE`, finalized.
-- ReferenceParticipant: `0x1131BB787287392a8d1E19F5bc5C76719296E433`, deploy tx `0x6a4f067b…fdaec4c`, `MAJORITY_AGREE`, finalized.
+- ReferenceParticipant: `0x1131BB787287392a8d1E19f5bc5C76719296E433` (EIP-55 checksummed), deploy tx `0x6a4f067b…fdaec4c`, `MAJORITY_AGREE`, finalized.
+- Explorer pages (verified to render the deployed source, not shells): `https://explorer-studio-dev.genlayer.com/address/0xDFCd787F4E8048d29602ebd09b2B2B91f3E97C2B` and `https://explorer-studio-dev.genlayer.com/address/0x1131BB787287392a8d1E19f5bc5C76719296E433`.
 - Fee profile from the chain policy: leader 100 / validator 200 timeunits, `rotations [3]`, `maxPriceGenPerTimeUnit 2`, caps `300000000`, deposit `100000000000010352` wei per transaction.
 - **Saga 1 = `COMPLETED`** (blueprint 1, 2 steps): receipts 1 and 2 both `SATISFIED` with verbatim excerpts from the participant's text, distinct receipt hashes, terminal hash `4f9ff034…`. The saga advanced through asynchronous finalized child transactions.
 - **Saga 2 = `COMPENSATED`** (blueprint 3, 2 steps): execution receipt 3 `NOT_SATISFIED` (the model cited the contradiction in the source), compensation receipt 4 `SATISFIED`, terminal hash `e76c547f…`, step 1 never dispatched. Both receipts `externally_corroborated = false`, correct for participant-text evidence.

@@ -10,7 +10,7 @@ Package the submission for Knot: confirm the live submission event and category,
 - `GENVM_VERSION=v0.6.0-rc5 .venv/bin/pytest tests/integration -q` → 5 passed.
 - `genvm-lint check` on both contracts → pass; `scripts/preflight.py` → pass; `compileall` clean.
 - First CI run on `main`: `direct-runtime` and `integration` both **succeeded** under `v0.6.0-rc6`.
-- Deployed to Studio Next (chain `61997`): Knot `0xDFCd787F4E8048d29602ebd09b2B2B91f3E97C2B`, ReferenceParticipant `0x1131BB787287392a8d1E19F5bc5C76719296E433`, both `MAJORITY_AGREE` and finalized, fee deposit `100000000000010352` wei each.
+- Deployed to Studio Next (chain `61997`): Knot `0xDFCd787F4E8048d29602ebd09b2B2B91f3E97C2B`, ReferenceParticipant `0x1131BB787287392a8d1E19f5bc5C76719296E433` (EIP-55 checksummed — `gen_call` matches that exact string), both `MAJORITY_AGREE` and finalized, fee deposit `100000000000010352` wei each.
 - **Saga 1 `COMPLETED`** (receipts 1 and 2, both `SATISFIED`, terminal hash `4f9ff034…`).
 - **Saga 2 `COMPENSATED`** (receipt 3 `NOT_SATISFIED`, receipt 4 `SATISFIED`, terminal hash `e76c547f…`, step 1 never dispatched).
 - Review round 2 (`state/REVIEW_ROUND2.md`) adjudicated: P1-1 and P1-2 fixed with regression tests, P1-5 and P1-3/P1-4 documented as limits, P2-1 refuted against the pinned std, P2-2/P2-3/P2-4/P2-5/P2-6 fixed.

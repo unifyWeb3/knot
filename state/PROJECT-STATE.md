@@ -50,8 +50,9 @@ Every finding was reproduced before it was acted on.
 - **Saga 1 = `COMPLETED`** (blueprint 1, 2 steps): receipts 1 and 2 both `SATISFIED` with verbatim excerpts from the participant's text, distinct receipt hashes, terminal hash `4f9ff034…`. The saga advanced through asynchronous finalized child transactions.
 - **Saga 2 = `COMPENSATED`** (blueprint 3, 2 steps): execution receipt 3 `NOT_SATISFIED` (the model cited the contradiction in the source), compensation receipt 4 `SATISFIED`, terminal hash `e76c547f…`, step 1 never dispatched. Both receipts `externally_corroborated = false`, correct for participant-text evidence.
 - Reproduce read-only with `scripts/collect_evidence.py --sagas 1 2`.
-- CI ran for the first time on the push: `direct-runtime` and `integration` both **succeeded** under `v0.6.0-rc6`.
-- Known artefacts of the deployment run: one orphaned participant contract (nonce 243, address unrecoverable), one empty blueprint (`id 2`), and a `gen_call` read limitation on the participant that its own writes and triggered calls contradict. All three are disclosed in `README.md`.
+- CI on the two pushed commits: run `36395836769` (`dc1504c`) passed both jobs; run `36423309694` (`3517731`, the deployment commit) passed `direct-runtime` but **failed** `integration` during `pip install` with a PyPI `ReadTimeoutError` — a registry flake, not a dependency defect. Both jobs now install with `--retries 5 --timeout 60`, and the claim is re-verified on each push rather than assumed.
+- Known artefacts of the deployment run: one orphaned participant contract (nonce 243, address unrecoverable), one empty blueprint (`id 2`), and the success leg's blueprint carrying a different title than the current script generates (saga 1 is readable but not re-creatable). All disclosed in `README.md`.
+- The round-3 review's address-checksum finding removed a **false** disclosure: the participant read is available and carries the on-chain idempotency proof (four operations, `calls = 1` each; `{'execution_effects': 3, 'compensation_effects': 1}`). Addresses are now EIP-55 normalised in `scripts/studio_client.py`.
 
 ## Next checkpoint
 

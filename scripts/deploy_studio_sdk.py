@@ -36,22 +36,9 @@ TARGETS = {
 
 
 def build_client():
-    from copy import deepcopy
+    from studio_client import build_client as _build
 
-    from genlayer_py.accounts import create_account
-    from genlayer_py.chains import studio_devnet
-    from genlayer_py.client import GenLayerClient
-
-    key = os.environ.get("GENLAYER_PRIVATE_KEY", "").strip()
-    if not key:
-        raise SystemExit(
-            "ERROR: GENLAYER_PRIVATE_KEY is not set. Source it from .env; "
-            "this script never reads .env itself."
-        )
-    account = create_account(key)
-    config = deepcopy(studio_devnet)
-    config.rpc_urls["default"]["http"] = [RPC]
-    return GenLayerClient(config, account), account
+    return _build()
 
 
 def main() -> int:

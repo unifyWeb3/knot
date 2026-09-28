@@ -59,19 +59,9 @@ LEGS = {
 
 
 def build_client():
-    from copy import deepcopy
+    from studio_client import build_client as _build
 
-    from genlayer_py.accounts import create_account
-    from genlayer_py.chains import studio_devnet
-    from genlayer_py.client import GenLayerClient
-
-    key = os.environ.get("GENLAYER_PRIVATE_KEY", "").strip()
-    if not key:
-        raise SystemExit("ERROR: GENLAYER_PRIVATE_KEY is not set; source it from .env")
-    account = create_account(key)
-    config = deepcopy(studio_devnet)
-    config.rpc_urls["default"]["http"] = [RPC]
-    return GenLayerClient(config, account), account
+    return _build()
 
 
 class Studio:
@@ -155,12 +145,16 @@ def main() -> int:
 
     leg = LEGS[args.leg]
     client, account = build_client()
-    studio = Studio(client, account, args.knot, args.participant)
+    from studio_client import checksum
+
+    knot = checksum(knot)
+    participant_address = checksum(participant_address)
+    studio = Studio(client, account, knot, participant_address)
 
     print(f"CHAIN    : {client.chain.id} (target {CHAIN_ID})")
     print(f"SIGNER   : {account.address}")
-    print(f"KNOT     : {args.knot}")
-    print(f"PARTICIP : {args.participant}")
+    print(f"KNOT     : {knot}")
+    print(f"PARTICIP : {participant_address}")
     print(f"LEG      : {args.leg}")
 
     if not args.execute:
@@ -170,28 +164,33 @@ def main() -> int:
 
     from genlayer_py.types.calldata import CalldataAddress
 
-    participant = CalldataAddress(args.participant)
+    participant = CalldataAddress(participant_address)
     blueprint = studio.write(
-        args.knot, "create_blueprint", [leg["title"], leg["purpose"]], "create_blueprint"
+        knot, "create_blueprint", [leg["title"], leg["purpose"]], "create_blueprint"
     )
     # The transaction's "result" field is not reliably the contract's return
-    # value, so identify the fresh blueprint by its title instead of trusting it.
+    # value, so identify the fresh blueprint by its own fields. Pick the highest
+    # matching id and require it to be unsealed: an older blueprint left over from
+    # an earlier run can carry the same title, and binding to it would mutate
+    # somebody else's definition.
     blueprint_id = None
     for candidate in range(1, 12):
         try:
-            definition = studio.view(args.knot, "get_blueprint", [candidate])
+            definition = studio.view(knot, "get_blueprint", [candidate])
         except Exception:
             continue
-        if definition.get("title") == leg["title"] and int(definition.get("step_count", 0)) == 0:
-            blueprint_id = candidate
-            break
+        if definition.get("title") != leg["title"]:
+            continue
+        if int(definition.get("step_count", 0)) != 0 or int(definition.get("status", 0)) != 0:
+            continue
+        blueprint_id = candidate
     if blueprint_id is None:
-        raise SystemExit("ERROR: could not identify the freshly created blueprint")
+        raise SystemExit("ERROR: could not identify the freshly created, empty, unsealed blueprint")
     print(f"BLUEPRINT: {blueprint_id} (tx result field was {blueprint.get('result')})")
 
     for label in ("flight", "hotel"):
         studio.write(
-            args.knot,
+            knot,
             "add_step",
             [
                 blueprint_id, participant, label, leg["payload"],
@@ -201,18 +200,18 @@ def main() -> int:
             ],
             f"add_step({label})",
         )
-    studio.write(args.knot, "seal_blueprint", [blueprint_id], "seal_blueprint")
+    studio.write(knot, "seal_blueprint", [blueprint_id], "seal_blueprint")
 
-    definition = studio.view(args.knot, "get_blueprint", [blueprint_id])
+    definition = studio.view(knot, "get_blueprint", [blueprint_id])
     print(f"SEALED   : steps={definition.get('step_count')} hash={str(definition.get('blueprint_hash'))[:20]}...")
 
     started = studio.write(
-        args.knot, "start_saga", [blueprint_id, f"trip-{args.leg}"], "start_saga"
+        knot, "start_saga", [blueprint_id, f"trip-{args.leg}"], "start_saga"
     )
     saga_id = None
     for candidate in range(1, 12):
         try:
-            probe = studio.view(args.knot, "get_saga", [candidate])
+            probe = studio.view(knot, "get_saga", [candidate])
         except Exception:
             continue
         if int(probe.get("blueprint_id", 0)) == blueprint_id:
@@ -227,25 +226,25 @@ def main() -> int:
           f"terminal_hash={str(saga.get('terminal_hash'))[:20]}...")
 
     for ordinal in range(int(saga.get("step_count", 0))):
-        state = studio.view(args.knot, "get_step_state", [saga_id, ordinal])
+        state = studio.view(knot, "get_step_state", [saga_id, ordinal])
         print(f"STEP {ordinal}  : status={state.get('status')} "
               f"attempts={state.get('execution_attempts')}/{state.get('compensation_attempts')}")
         for phase, key in (("execution", "execution_receipt_id"), ("compensation", "compensation_receipt_id")):
             receipt_id = int(state.get(key, 0))
             if receipt_id:
-                receipt = studio.view(args.knot, "get_receipt", [receipt_id])
+                receipt = studio.view(knot, "get_receipt", [receipt_id])
                 print(f"    {phase:12}: id={receipt_id} phase={receipt.get('phase')} "
                       f"verdict={receipt.get('verdict')} corroborated={receipt.get('externally_corroborated')}")
                 print(f"                  reason={receipt.get('reason')}")
                 print(f"                  excerpt={str(receipt.get('excerpt'))[:90]}")
 
-    print("EFFECTS  :", studio.view(args.participant, "get_effect_counts", required=False))
+    print("EFFECTS  :", studio.view(participant_address, "get_effect_counts", required=False))
     for check in ("is_completed", "is_compensated", "is_stuck"):
-        print(f"{check:11}:", studio.view(args.knot, check, [saga_id], required=False))
+        print(f"{check:11}:", studio.view(knot, check, [saga_id], required=False))
     print("--- transactions ---")
     for label, tx in studio.txs:
         print(f"{label:28} {tx}")
-    print(f"EXPLORER : {EXPLORER}/address/{args.knot}")
+    print(f"EXPLORER : {EXPLORER}/address/{knot}")
     return 0
 
 

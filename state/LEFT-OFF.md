@@ -18,8 +18,10 @@ Package the submission for Knot: confirm the live submission event and category,
 ## Disclosed rough edges
 
 - One orphaned participant contract (nonce 243) whose address could not be recovered, and one empty blueprint (`id 2`), both from an interrupted deploy run with a status-polling bug. Neither is referenced by either proven saga.
-- `scripts/lifecycle_studio.py` originally trusted a transaction's `result` field as the contract return value, which put the success leg's steps on the wrong blueprint. Fixed fail-closed (identify by title, verify `step_count == 0`).
-- `gen_call` cannot read the participant contract on Studio Next, although its writes and triggered calls finalized. `scripts/collect_evidence.py` treats that read as optional and says why.
+- `scripts/lifecycle_studio.py` originally trusted a transaction's `result` field as the contract return value, which put the success leg's steps on the wrong blueprint. Fixed fail-closed: identify by title, require `step_count == 0` and an unsealed status, take the highest matching id.
+- The earlier claim that Studio Next could not read the participant was **wrong**: the deploy helper printed a non-checksummed address and `gen_call` compares the stored string exactly. Fixed by EIP-55 normalisation; the read works and carries the idempotency proof.
+- Saga 1's blueprint has a different title than the current script generates, so `--leg success` builds a new blueprint instead of reproducing saga 1. Saga 1 remains fully readable.
+- The deployment commit's `integration` CI job failed on a PyPI read timeout, not a defect; pip now retries, and the claim is re-verified per push.
 
 ## Constraints
 

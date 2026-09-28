@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip
-      - run: pip install -r requirements-test.txt
+      - run: pip install --retries 5 --timeout 60 -r requirements-test.txt
       - name: Source and target preflight
         run: python scripts/preflight.py
       - name: Python compilation
@@ -37,7 +37,9 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip
-      - run: pip install -r requirements-integration.txt
+      # A PyPI read timeout was observed failing this job outright; the toolchain
+      # is unchanged, so retry the registry rather than report a false red build.
+      - run: pip install --retries 5 --timeout 60 -r requirements-integration.txt
       - name: Source and target preflight
         run: python scripts/preflight.py
       - name: Python compilation

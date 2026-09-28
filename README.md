@@ -63,7 +63,12 @@ Deployed to Studio Next / Studio-dev, chain `61997`, RPC
 | Contract | Address | Deploy tx | Result |
 | --- | --- | --- | --- |
 | Knot | [`0xDFCd787F4E8048d29602ebd09b2B2B91f3E97C2B`](https://explorer-studio-dev.genlayer.com/address/0xDFCd787F4E8048d29602ebd09b2B2B91f3E97C2B) | `0xec1c79b4b5b9cc9c0e1b765c200ff10cbd63e56b2730a258504652983b1ffba6` | `MAJORITY_AGREE`, finalized |
-| ReferenceParticipant | [`0x1131BB787287392a8d1E19F5bc5C76719296E433`](https://explorer-studio-dev.genlayer.com/address/0x1131BB787287392a8d1E19F5bc5C76719296E433) | `0x6a4f067b4660e42453497fb50f2c49840c116fe90f58254bdafa94566fdaec4c` | `MAJORITY_AGREE`, finalized |
+| ReferenceParticipant | [`0x1131BB787287392a8d1E19f5bc5C76719296E433`](https://explorer-studio-dev.genlayer.com/address/0x1131BB787287392a8d1E19f5bc5C76719296E433) | `0x6a4f067b4660e42453497fb50f2c49840c116fe90f58254bdafa94566fdaec4c` | `MAJORITY_AGREE`, finalized |
+
+Addresses are shown in EIP-55 checksum form. That is not cosmetic: `gen_call`
+matches the stored address string exactly, so a mis-cased address answers
+`Contract not found` for a contract that demonstrably exists. See "what did not
+go to plan" below for how that nearly became a false claim.
 
 Fee profile actually used, derived from the chain's fee policy
 (`leaderTimeunitsAllocation 100`, `validatorTimeunitsAllocation 200`,
@@ -93,9 +98,25 @@ reverse and the saga ended `COMPENSATED`; step 2 was never dispatched.
 | 3 | execution | `NOT_SATISFIED` | "…the reservation request for trip two was declined and that no booking exists, which contradicts confirmation and active status." |
 | 4 | compensation | `SATISFIED` | "…trip two has no reservation, which materially establishes that no trip two reservation remains in effect." |
 
-Terminal hash `e76c547f920ac3bf5eed...`; both receipts are
-`externally_corroborated = false`, which is correct for participant-text
-evidence and is the claim the round-2 review asked us to make honest.
+Terminal hash `e76c547f920ac3bf5eede78d7a66dcf5dd68338282175c3df62534c66c7ec9db`; both
+receipts are `externally_corroborated = false`, which is correct for
+participant-text evidence and is the claim the round-2 review asked us to make
+honest.
+
+### Participant effects and idempotency, read back from chain
+
+The participant's own state confirms each effect was applied exactly once. Every
+operation ID Knot generated has `calls = 1`, and the effect counters match the
+three execution dispatches and one compensation dispatch the two sagas produced:
+
+| Operation | Saga / step | Phase | `calls` |
+| --- | --- | --- | --- |
+| `91331091…f72ba` | 1 / 0 | execution | 1 |
+| `975c7544…b779` | 1 / 1 | execution | 1 |
+| `6cbb913e…4b683` | 2 / 0 | execution | 1 |
+| `402440ab…569b0` | 2 / 0 | compensation | 1 |
+
+`get_effect_counts` returns `{'execution_effects': 3, 'compensation_effects': 1}`.
 
 Reproduce any of it read-only:
 
@@ -103,7 +124,7 @@ Reproduce any of it read-only:
 # export GENLAYER_PRIVATE_KEY from .env first; the key is never printed
 python scripts/collect_evidence.py \
     --knot 0xDFCd787F4E8048d29602ebd09b2B2B91f3E97C2B \
-    --participant 0x1131BB787287392a8d1E19F5bc5C76719296E433 --sagas 1 2
+    --participant 0x1131BB787287392a8d1E19f5bc5C76719296E433 --sagas 1 2
 ```
 
 ### Deployment notes, including what did not go to plan
@@ -112,8 +133,13 @@ python scripts/collect_evidence.py \
   keychain and reports `OS keychain is not available` under WSL, and it accepts
   no private-key environment variable. `scripts/deploy_studio_sdk.py` and
   `scripts/lifecycle_studio.py` therefore drive the network with `genlayer-py`,
-  which signs in-process. Both scripts are dry-run by default and take
-  `--execute`; neither ever prints the key.
+  which signs in-process. All three scripts are dry-run by default and take
+  `--execute`.
+- **The signing key is never printed, by construction rather than by luck.** The
+  three scripts share `scripts/studio_client.py`, which shape-checks the key
+  before use and replaces every signer error with a fixed message, because some
+  signer paths quote the value they rejected. Verified against a malformed key on
+  all three: one-line error, value withheld, no traceback.
 - **`studio-dev` only exists in the `0.40.0-rc.3` CLI.** The `latest` CLI
   (`0.39.2`) knows only `studionet`, which is a different chain (`61999`).
 - **A deploy needs an explicit fee distribution**, otherwise the consensus
@@ -125,14 +151,26 @@ python scripts/collect_evidence.py \
   derivation nor a usable block-receipt index to recover it. It is unused; the
   address above is the live participant. An empty blueprint (`id 2`) is likewise
   left over from that same interrupted run.
+- **A false claim we caught and fixed rather than repeated.** An earlier version
+  of this section blamed the node: it said `gen_call` could not read the
+  participant "although its writes and its triggered calls both finalized". That
+  was our bug. The deploy helper printed a non-checksummed address
+  (`…E19F5bc5C…`) while the chain stores `…E19f5bc5C…`, and `gen_call` compares
+  the stored string exactly. With the checksummed address the read works, and it
+  is the read that carries the idempotency proof above. `scripts/studio_client.py`
+  now normalises every address, and `collect_evidence.py` treats the participant
+  read as required rather than optional, because a silent skip there would have
+  hidden the best evidence we have.
 - **The script's blueprint-id lookup was a real bug** and is now fixed
-  fail-closed: the transaction `result` field is not reliably the contract's
+  fail-closed: a transaction's `result` field is not reliably the contract's
   return value, so the script identifies the fresh blueprint by title and
-  verifies `step_count == 0` before adding steps.
-- **`gen_call` cannot read the participant** (`Contract not found`) even though
-  its writes and its triggered `execute_step` calls both finalized; the receipt
-  `evidence_ref` values are the participant's own returned text. The evidence
-  collector treats that read as optional and says so.
+  requires `step_count == 0` **and** an unsealed status, taking the highest
+  matching id. The earlier version would have bound to the leftover blueprint
+  `id 2`, which shares the success leg's title.
+- **Saga 1 is not re-creatable by the current script.** Its blueprint was created
+  by an earlier exploratory run under a different title, so
+  `lifecycle_studio.py --leg success` builds a new blueprint rather than saga 1's.
+  Saga 1 itself is fully readable and `collect_evidence.py --sagas 1 2` prints it.
 
 ## Testing
 

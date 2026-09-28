@@ -25,8 +25,8 @@ RPC = "https://studio-dev.genlayer.com/api"
 EXPLORER = "https://explorer-studio-dev.genlayer.com"
 
 SAGA_NAMES = {1: "ACTIVE", 2: "COMPLETED", 3: "COMPENSATING", 4: "COMPENSATED", 5: "STUCK"}
-STEP_NAMES = {0: "PENDING", 1: "DISPATCHED", 2: "CONFIRMED", 3: "EXECUTION_FAILED",
-              4: "COMPENSATION_DISPATCHED", 5: "EXECUTION_CONFIRMED", 6: "COMPENSATION_FAILED"}
+STEP_NAMES = {0: "PENDING", 1: "EXECUTION_DISPATCHED", 2: "CONFIRMED", 3: "EXECUTION_FAILED",
+              4: "COMPENSATION_DISPATCHED", 5: "COMPENSATED", 6: "COMPENSATION_FAILED"}
 PHASE_NAMES = {1: "execution", 2: "compensation"}
 VERDICT_NAMES = {1: "SATISFIED", 2: "NOT_SATISFIED", 3: "AMBIGUOUS", 4: "UNAVAILABLE", 5: "TIMEOUT"}
 
@@ -36,26 +36,25 @@ def main() -> int:
     parser.add_argument("--knot", required=True)
     parser.add_argument("--participant", required=True)
     parser.add_argument("--sagas", type=int, nargs="+", default=[1])
+    parser.add_argument(
+        "--allow-missing-participant",
+        action="store_true",
+        help="do not fail when the participant read is unavailable",
+    )
     args = parser.parse_args()
 
-    from copy import deepcopy
+    from studio_client import build_client, checksum
 
-    from genlayer_py.accounts import create_account
-    from genlayer_py.chains import studio_devnet
-    from genlayer_py.client import GenLayerClient
-
-    key = os.environ.get("GENLAYER_PRIVATE_KEY", "").strip()
-    if not key:
-        raise SystemExit("ERROR: GENLAYER_PRIVATE_KEY is not set; source it from .env")
-    client = GenLayerClient(deepcopy(studio_devnet), create_account(key))
-    client.chain.rpc_urls["default"]["http"] = [RPC]
+    client, account = build_client()
+    knot = checksum(args.knot)
+    participant = checksum(args.participant)
 
     def view(method, call_args=None):
-        return client.read_contract(args.knot, method, call_args or [])
+        return client.read_contract(knot, method, call_args or [])
 
     print(f"CHAIN     : {client.chain.id}")
-    print(f"KNOT      : {args.knot}")
-    print(f"EXPLORER  : {EXPLORER}/address/{args.knot}")
+    print(f"KNOT      : {knot}")
+    print(f"EXPLORER  : {EXPLORER}/address/{knot}")
     constants = view("get_protocol_constants")
     print(f"PROTOCOL  : {json.dumps(constants, default=str)[:400]}")
     print()
@@ -96,13 +95,33 @@ def main() -> int:
             print(f"  {check:14}: {view(check, [saga_id])}")
         print()
 
+    # The participant read carries the on-chain idempotency proof, so it is
+    # required by default; a silent skip here would erase the best evidence we
+    # have. Pass --allow-missing-participant only when diagnosing that read itself.
     try:
-        print("PARTICIPANT effects:", client.read_contract(args.participant, "get_effect_counts"))
+        effects = client.read_contract(participant, "get_effect_counts")
+        print(f"PARTICIPANT: {participant}")
+        print(f"  effects   : {effects}")
+        for saga_id in args.sagas:
+            saga = view("get_saga", [saga_id])
+            for ordinal in range(int(saga.get("step_count", 0))):
+                state = view("get_step_state", [saga_id, ordinal])
+                for field in ("execution_operation_id", "compensation_operation_id"):
+                    operation_id = state.get(field)
+                    if not operation_id:
+                        continue
+                    record = client.read_contract(participant, "get_operation", [operation_id])
+                    print(f"  operation : {field:26} calls={record.get('calls')} "
+                          f"scenario={record.get('scenario_id')} evidence={str(record.get('evidence_ref'))[:60]!r}")
     except Exception as exc:
-        print(f"PARTICIPANT effects: unavailable ({str(exc)[:110]})")
-        print("  Note: Studio Next's gen_call reports 'Contract not found' for this participant")
-        print("  although its writes and its triggered execute_step calls both finalized;")
-        print("  the receipt evidence_ref values above are the participant's own returned text.")
+        message = str(exc)[:110]
+        if args.allow_missing_participant:
+            print(f"PARTICIPANT: unavailable, and --allow-missing-participant was passed ({message})")
+        else:
+            print(f"PARTICIPANT: read failed ({message})", file=sys.stderr)
+            print("  This read carries the idempotency proof. Pass --allow-missing-participant", file=sys.stderr)
+            print("  only when diagnosing the read itself. Check the address checksum first.", file=sys.stderr)
+            return 1
     return 0
 
 

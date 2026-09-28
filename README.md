@@ -4,7 +4,8 @@
 
 Knot lets a builder define an immutable ordered workflow, dispatch participant Intelligent Contracts asynchronously, independently verify semantic evidence through GenLayer consensus, and compensate completed steps in reverse order when a later step cannot be verified.
 
-> Status: implementation foundation. No deployment or submission is claimed yet.
+> Status: deployed to Studio Next / Studio-dev (chain `61997`) with both lifecycles
+> proven on-chain. No hackathon submission has been made yet.
 
 ## Why GenLayer?
 
@@ -52,6 +53,86 @@ contracts/                 Core Intelligent Contract and reference participant
  scripts/                  Preflight, deployment, and evidence helpers
  state/                    Project checkpoints and handoff notes
 ```
+
+## Deployment on Studio Next
+
+Deployed to Studio Next / Studio-dev, chain `61997`, RPC
+`https://studio-dev.genlayer.com/api`, from account
+`0x3211d1419709682b81c53cc51cb63622e25488d3`.
+
+| Contract | Address | Deploy tx | Result |
+| --- | --- | --- | --- |
+| Knot | [`0xDFCd787F4E8048d29602ebd09b2B2B91f3E97C2B`](https://explorer-studio-dev.genlayer.com/address/0xDFCd787F4E8048d29602ebd09b2B2B91f3E97C2B) | `0xec1c79b4b5b9cc9c0e1b765c200ff10cbd63e56b2730a258504652983b1ffba6` | `MAJORITY_AGREE`, finalized |
+| ReferenceParticipant | [`0x1131BB787287392a8d1E19F5bc5C76719296E433`](https://explorer-studio-dev.genlayer.com/address/0x1131BB787287392a8d1E19F5bc5C76719296E433) | `0x6a4f067b4660e42453497fb50f2c49840c116fe90f58254bdafa94566fdaec4c` | `MAJORITY_AGREE`, finalized |
+
+Fee profile actually used, derived from the chain's fee policy
+(`leaderTimeunitsAllocation 100`, `validatorTimeunitsAllocation 200`,
+`rotations [3]`, `maxPriceGenPerTimeUnit 2`, caps `300000000`): fee deposit
+`100000000000010352` wei per transaction.
+
+### Lifecycle 1 — success, `COMPLETED`
+
+Two steps, participant-text evidence, real validators, real model judgments. The
+saga advanced through **asynchronous finalized child transactions**, which is the
+behaviour the simulator could not prove.
+
+| Receipt | Phase | Verdict | Excerpt |
+| --- | --- | --- | --- |
+| 1 | execution | `SATISFIED` | `Reservation H-100 is confirmed and active.` |
+| 2 | execution | `SATISFIED` | `Reservation H-100 is confirmed and active.` |
+
+Terminal hash `4f9ff0347db777fd22bd88607b357c599ad9e383ccf48e45052090ac357bde08`.
+
+### Lifecycle 2 — failure, `COMPENSATED`
+
+Step 1's evidence did not establish its criterion, so the step compensated in
+reverse and the saga ended `COMPENSATED`; step 2 was never dispatched.
+
+| Receipt | Phase | Verdict | Reason returned by the network's models |
+| --- | --- | --- | --- |
+| 3 | execution | `NOT_SATISFIED` | "…the reservation request for trip two was declined and that no booking exists, which contradicts confirmation and active status." |
+| 4 | compensation | `SATISFIED` | "…trip two has no reservation, which materially establishes that no trip two reservation remains in effect." |
+
+Terminal hash `e76c547f920ac3bf5eed...`; both receipts are
+`externally_corroborated = false`, which is correct for participant-text
+evidence and is the claim the round-2 review asked us to make honest.
+
+Reproduce any of it read-only:
+
+```bash
+# export GENLAYER_PRIVATE_KEY from .env first; the key is never printed
+python scripts/collect_evidence.py \
+    --knot 0xDFCd787F4E8048d29602ebd09b2B2B91f3E97C2B \
+    --participant 0x1131BB787287392a8d1E19F5bc5C76719296E433 --sagas 1 2
+```
+
+### Deployment notes, including what did not go to plan
+
+- **The `genlayer` CLI cannot sign on this host.** It keeps keys in an OS
+  keychain and reports `OS keychain is not available` under WSL, and it accepts
+  no private-key environment variable. `scripts/deploy_studio_sdk.py` and
+  `scripts/lifecycle_studio.py` therefore drive the network with `genlayer-py`,
+  which signs in-process. Both scripts are dry-run by default and take
+  `--execute`; neither ever prints the key.
+- **`studio-dev` only exists in the `0.40.0-rc.3` CLI.** The `latest` CLI
+  (`0.39.2`) knows only `studionet`, which is a different chain (`61999`).
+- **A deploy needs an explicit fee distribution**, otherwise the consensus
+  contract reverts with `FeesDistributionMissing`. Both scripts call
+  `estimate_transaction_fees()` first.
+- **One orphaned participant contract exists.** An earlier deploy (account nonce
+  243) was submitted by a script whose status-polling bug discarded the
+  transaction hash before printing it, and this node offers neither address
+  derivation nor a usable block-receipt index to recover it. It is unused; the
+  address above is the live participant. An empty blueprint (`id 2`) is likewise
+  left over from that same interrupted run.
+- **The script's blueprint-id lookup was a real bug** and is now fixed
+  fail-closed: the transaction `result` field is not reliably the contract's
+  return value, so the script identifies the fresh blueprint by title and
+  verifies `step_count == 0` before adding steps.
+- **`gen_call` cannot read the participant** (`Contract not found`) even though
+  its writes and its triggered `execute_step` calls both finalized; the receipt
+  `evidence_ref` values are the participant's own returned text. The evidence
+  collector treats that read as optional and says so.
 
 ## Testing
 

@@ -2,7 +2,7 @@
 
 ## Current status
 
-Knot is implemented in `/home/unify/pavel` as a standalone GenLayer Intelligent Contract primitive: `contracts/knot.py` (blueprint/seal/saga state machine with bounded evidence judgment and reverse compensation) plus `contracts/reference_participant.py`.
+Knot is implemented in `/home/unify/pavel` as a standalone GenLayer Intelligent Contract primitive: `contracts/knot.py` (blueprint/seal/saga state machine with bounded evidence judgment and reverse compensation) plus `contracts/reference_participant.py`. It is **deployed to Studio Next / Studio-dev (chain `61997`)** with both lifecycles proven on-chain, and pushed to the private repository `unifyWeb3/knot` (branch `main`).
 
 ## Decisions
 
@@ -42,6 +42,17 @@ Every finding was reproduced before it was acted on.
 
 - No deployment, transaction, or submission has been performed. No Git remote is configured; nothing has been pushed.
 
+## Deployment
+
+- Knot: `0xDFCd787F4E8048d29602ebd09b2B2B91f3E97C2B`, deploy tx `0xec1c79b4…b1ffba6`, `MAJORITY_AGREE`, finalized.
+- ReferenceParticipant: `0x1131BB787287392a8d1E19F5bc5C76719296E433`, deploy tx `0x6a4f067b…fdaec4c`, `MAJORITY_AGREE`, finalized.
+- Fee profile from the chain policy: leader 100 / validator 200 timeunits, `rotations [3]`, `maxPriceGenPerTimeUnit 2`, caps `300000000`, deposit `100000000000010352` wei per transaction.
+- **Saga 1 = `COMPLETED`** (blueprint 1, 2 steps): receipts 1 and 2 both `SATISFIED` with verbatim excerpts from the participant's text, distinct receipt hashes, terminal hash `4f9ff034…`. The saga advanced through asynchronous finalized child transactions.
+- **Saga 2 = `COMPENSATED`** (blueprint 3, 2 steps): execution receipt 3 `NOT_SATISFIED` (the model cited the contradiction in the source), compensation receipt 4 `SATISFIED`, terminal hash `e76c547f…`, step 1 never dispatched. Both receipts `externally_corroborated = false`, correct for participant-text evidence.
+- Reproduce read-only with `scripts/collect_evidence.py --sagas 1 2`.
+- CI ran for the first time on the push: `direct-runtime` and `integration` both **succeeded** under `v0.6.0-rc6`.
+- Known artefacts of the deployment run: one orphaned participant contract (nonce 243, address unrecoverable), one empty blueprint (`id 2`), and a `gen_call` read limitation on the participant that its own writes and triggered calls contradict. All three are disclosed in `README.md`.
+
 ## Next checkpoint
 
-Request approval to read `.env`, configure the Git remote, and sign a transaction; then deploy both contracts to Studio Next `61997`, prove both lifecycles there, and capture receipts, fee profile, and explorer evidence.
+Package the submission: confirm the live submission event and category, then hand the reviewer session the deployed addresses, transaction hashes, and explorer links so it can verify the on-chain evidence independently before anything is submitted.

@@ -28,13 +28,15 @@ def check(condition: bool, message: str) -> None:
 
 
 def source_files() -> list[pathlib.Path]:
+    # Generated, gitignored trees are skipped so the reported file count is
+    # stable across runs; everything else is scanned, including dotfiles such as
+    # a stray ".env:Zone.Identifier", so secret hygiene still covers them.
+    ignored = (".git", ".venv", "__pycache__", ".pytest_cache", "artifacts")
     return [
         path
         for path in ROOT.rglob("*")
         if path.is_file()
-        and ".git" not in path.parts
-        and ".venv" not in path.parts
-        and "__pycache__" not in path.parts
+        and not any(part in ignored for part in path.parts)
     ]
 
 

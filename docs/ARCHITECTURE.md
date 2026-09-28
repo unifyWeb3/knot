@@ -12,7 +12,7 @@ The model must not choose the next step, create a compensation, authorize a part
 ## Frozen design decisions
 
 - **Hashing:** `knot-sha256-v1` uses a versioned, domain-separated, length-prefixed encoding for every field. Step hashes are aggregated in ordinal order into the blueprint hash.
-- **Evidence source:** every public-URL step freezes an exact `https://` evidence prefix. Participant text steps must have an empty prefix.
+- **Evidence source:** every public-URL step freezes an exact `https://` evidence prefix, which must be a directory prefix served by a public host (see `docs/THREAT_MODEL.md`). Participant text steps must have an empty prefix.
 - **Controller:** the blueprint owner is the initial and default Saga controller. Permissionless start is not part of v1.
 - **Timeout:** the deadline is parent-dispatch transaction time plus the step timeout, with a minimum of 300 seconds. A late callback may still be accepted until a timeout transaction crystallizes failure.
 - **Retry:** compensation retry is bounded revalidation of the same logical operation and reuses its operation ID. v1 does not silently start a new corrective effect.

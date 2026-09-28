@@ -16,12 +16,30 @@ Knot is implemented in `/home/unify/pavel` as a standalone GenLayer Intelligent 
 ## Validation status
 
 - `genvm-lint check` passes for both contracts (3 lint checks + validation: Knot 8 view/8 write, ReferenceParticipant 3 view/5 write).
-- `scripts/preflight.py` passes (34 files scanned; target chain 61997).
-- Direct-mode suite: **21 tests pass** (`GENVM_VERSION=v0.6.0-rc5 .venv/bin/pytest tests/direct -q`), covering seal determinism and hash-mutation sensitivity, owner/controller guards, malformed input rejection, evidence re-derivation plus validator disagreement, full success lifecycle with receipts, duplicate-callback no-op, reverse compensation, STUCK + bounded retry budget, and timeout crystallization before late callbacks.
+- `scripts/preflight.py` passes; the scanned-file count is now stable because generated trees (`artifacts/`, `.pytest_cache/`) are skipped, while dotfiles are still scanned for secret hygiene.
+- Direct-mode suite: **50 tests pass** (`GENVM_VERSION=v0.6.0-rc5 .venv/bin/pytest tests/direct -q`) — 10 blueprint, 2 evidence, 29 adversarial judge-seam, 6 saga lifecycle, 3 reference-participant.
 - Integration suite: **5 tests pass** (`GENVM_VERSION=v0.6.0-rc5 .venv/bin/pytest tests/integration -q`) on glsim in-process, proving the cross-contract round trip that direct mode cannot execute: success lifecycle with hashed receipts and terminal hash, failed execution → reverse compensation, failed compensation → `STUCK` with 3 bounded retries that reuse one operation ID while the participant effect count stays at 1, deadline crystallization of an unanswered compensation plus late-callback rejection, and coordinator-pinned dispatch rejection.
-- `contracts/knot.py` bug fixed this session: `DynArray[u256]()` cannot be instantiated in the v0.6 std; the record field is now seeded with `[]` (the record setter accepts a sequence).
+- `contracts/knot.py` bug fixed earlier: `DynArray[u256]()` cannot be instantiated in the v0.6 std; the record field is now seeded with `[]`.
 - `contracts/knot.py` judge switched to `exec_prompt(response_format="text")` + `_v_parse_decision` so one parser serves every runtime; gltest's mock layer auto-parses bare JSON strings, which the JSON path rejects and which made mocked SATISFIED verdicts impossible on glsim.
-- CI (`.github/workflows/ci.yml`) runs preflight, compileall, `genvm-lint`, and the direct suite under `v0.6.0-rc6`, plus a second job for the glsim integration suite (`requirements-integration.txt`). CI has not yet been exercised because no push has occurred.
+
+### Review round 2 adjudication (`state/REVIEW_ROUND2.md`)
+
+Every finding was reproduced before it was acted on.
+
+| Finding | Verdict | Action |
+| --- | --- | --- |
+| P1-1 no local/private destination filter | confirmed | `_v_public_https_host` rejects loopback, link-local, RFC1918, CGNAT, unique-local, multicast/reserved/documentation ranges, integer-form addresses, and local/internal names; the prefix must be a directory so `ref.startswith(prefix)` pins the authority. Regression tests added. |
+| P1-2 `externally_corroborated` true on timeout receipts | confirmed | Derived from `mode == PUBLIC_URL and evidence_ref != ""`; regression test asserts both directions (verified fetch → `True`, timeout → `False`). |
+| P1-3 direct mode returns the leader's value | partially confirmed | Real harness limitation, not a contract defect. Partially refuted as stated: `tests/direct/test_knot_evidence.py` and the adversarial suite already assert `run_validator() is False`, so the suite is not green with a broken validator. The saga-halting consequence is documented in README "What the tests do not prove" instead of being claimed. |
+| P1-4 single-validator simulator | confirmed as a limit | No offline fix: glsim's `call_method` path bypasses consensus entirely, so validator count only matters for the signed-transaction path. Recorded as a known gap. |
+| P1-5 synchronous drain | confirmed | README proof table now states that the simulator drains inside the calling transaction and that on chain the same steps are async child transactions. |
+| P2-1 `run_nondet_unsafe` | **refuted** | It does not exist in the pinned std; the sandboxing variant is `run_nondet_default`, and `run_nondet`'s un-sandboxed `Disagree`-on-error behaviour is the fail-closed one we want. No code change; documented in `docs/CONSENSUS.md`. |
+| P2-2 wrong comment on malformed output | confirmed | Comment corrected: no decodable object → `AMBIGUOUS`; undecodable object or executor error → `UNAVAILABLE`. |
+| P2-3 dead `MAX_REASON_JSON` | confirmed | Removed. |
+| P2-4 unstable preflight count | confirmed | Generated trees skipped. |
+| P2-5 CI gaps | confirmed | Integration job now also runs preflight and `compileall`. CI has still never executed (no remote). |
+| P2-6 validator fetched the source twice | confirmed | The validator now checks the excerpt against the source its own re-derivation just read, removing one fetch per judgment and the disagreement a mutating source would cause. |
+
 - No deployment, transaction, or submission has been performed. No Git remote is configured; nothing has been pushed.
 
 ## Next checkpoint

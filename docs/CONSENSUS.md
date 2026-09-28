@@ -39,11 +39,11 @@ The validator function:
 4. for `SATISFIED`, checks that the leader excerpt exists in the validator's own observed source;
 5. returns `False` for malformed or unavailable results rather than trusting the leader.
 
-Use the v0.6 `gl.vm.run_nondet` boundary and handle errors inside the validator. A JSON schema check alone is not consensus.
+Use the v0.6 `gl.vm.run_nondet` boundary and handle errors inside the validator. A JSON schema check alone is not consensus. `run_nondet` deliberately does not spawn a sandbox around the validator: a validator that raises becomes a `Disagree`, the same outcome as returning `False`, which is the fail-closed behaviour wanted here. (`run_nondet_unsafe` is not part of the pinned v0.6 std lib, and `run_nondet_default` is the sandboxing variant, not a safer one.)
 
 ## Evidence modes
 
-- `PUBLIC_URL`: preferred for material external effects. Each step freezes an exact HTTPS evidence prefix; the callback URL must remain inside that prefix.
+- `PUBLIC_URL`: preferred for material external effects. Each step freezes an exact HTTPS evidence prefix; the callback URL must remain inside that prefix. A receipt is marked `externally_corroborated = true` only when a source was actually read and judged, so a `TIMEOUT` receipt on a public-URL step is recorded as uncorroborated.
 - `PARTICIPANT_TEXT`: explicitly weaker attestation mode. It must have no source prefix, is marked `externally_corroborated = false` in receipts, and must not be described as independent external proof.
 
 The first reviewer demo should use `PUBLIC_URL` with a commit-pinned prefix.

@@ -40,6 +40,8 @@ Validators independently re-derive the decision. A disagreement, unavailable sou
 
 Reject malformed, non-HTTPS, local, and obviously private destinations. Do not claim complete SSRF protection unless the runtime's redirect and DNS behavior has been verified. Prefer allowlisted evidence hosts for the first release.
 
+Implemented in `Knot._v_public_https_host`: the frozen prefix must be a directory prefix (which is what pins its authority against a participant-supplied reference) and its host must be a public, non-integer, multi-label domain. Loopback, link-local, RFC1918, carrier-grade NAT, unique-local, multicast, reserved, and documentation ranges are rejected, as are `.local`, `.internal`, `.lan`, `.intranet`, `.private`, `.home.arpa`, and bare names such as `localhost` or `metadata`. Redirects, DNS resolution, and resolver behaviour are outside the contract's control and remain unverified.
+
 ### Terminal auditability
 
 The terminal commitment must accurately describe what it commits to. Do not claim that it includes all historical retry receipts unless those receipts are explicitly included.
